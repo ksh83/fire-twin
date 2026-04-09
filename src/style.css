@@ -1,0 +1,327 @@
+/* ── CSS 변수 ──────────────────────────────────────────────── */
+:root {
+  --bg:        #060810;
+  --surface:   #0c1018;
+  --surface2:  #121820;
+  --border:    #1a2230;
+  --accent:    #ff4422;
+  --safe:      #00e5a0;
+  --warn:      #ffb300;
+  --danger:    #ff4422;
+  --info:      #2fa8ff;
+  --text:      #dde4ee;
+  --muted:     #4a5568;
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'Noto Sans KR', sans-serif;
+}
+
+/* ── 리셋 & 기본 ────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden;
+             background: var(--bg); color: var(--text);
+             font-family: var(--sans); }
+
+/* ── Cesium 기본 UI 숨김 ────────────────────────────────────── */
+.cesium-widget-credits,
+.cesium-credit-logoContainer,
+.cesium-credit-textContainer { display: none !important; }
+
+/* ── 로딩 화면 ──────────────────────────────────────────────── */
+#loading {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px;
+  transition: opacity 0.8s ease;
+}
+#loading.hidden { opacity: 0; pointer-events: none; }
+.load-logo {
+  font-family: var(--mono); font-size: 24px;
+  font-weight: 700; color: var(--accent); letter-spacing: 0.12em;
+}
+.load-track {
+  width: 220px; height: 2px;
+  background: var(--border); border-radius: 1px; overflow: hidden;
+}
+.load-fill {
+  height: 100%; background: var(--accent); border-radius: 1px;
+  animation: loadfill 3s ease-out forwards;
+}
+@keyframes loadfill { from { width: 0 } to { width: 100% } }
+.load-text {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.2em;
+}
+
+/* ── Cesium 컨테이너 ─────────────────────────────────────────── */
+#cesiumContainer {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+
+/* ── 상단바 ──────────────────────────────────────────────────── */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 52px;
+  z-index: 100;
+  background: linear-gradient(180deg, rgba(6,8,16,0.97) 0%, rgba(6,8,16,0.82) 100%);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  display: flex; align-items: center;
+  justify-content: space-between; padding: 0 20px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-weight: 700;
+  font-size: 14px; letter-spacing: 0.1em; color: var(--accent);
+}
+.logo-box {
+  width: 30px; height: 30px; border-radius: 5px;
+  background: rgba(255,68,34,0.12);
+  border: 1px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.logo-sub {
+  font-size: 8px; font-weight: 400;
+  color: var(--muted); letter-spacing: 0.18em; margin-top: 3px;
+}
+.top-status { display: flex; gap: 24px; align-items: center; }
+.ts-item {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+.ts-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--safe); flex-shrink: 0;
+  animation: blink 2s ease-in-out infinite;
+}
+.ts-dot.warn   { background: var(--warn); }
+.ts-dot.danger { background: var(--danger); animation-duration: 0.7s; }
+.ts-val { color: var(--text); font-weight: 600; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.top-clock {
+  font-family: var(--mono); font-size: 20px;
+  font-weight: 700; color: var(--text);
+  letter-spacing: 0.04em; min-width: 82px; text-align: right;
+}
+
+/* ── 좌 패널 ──────────────────────────────────────────────────── */
+#leftPanel {
+  position: absolute; top: 52px; left: 0; bottom: 0; width: 272px;
+  z-index: 100;
+  background: linear-gradient(90deg, rgba(6,8,16,0.98) 0%, rgba(6,8,16,0.87) 100%);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-head {
+  padding: 13px 15px 10px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.panel-label {
+  font-family: var(--mono); font-size: 8px;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 3px;
+}
+.panel-title { font-size: 11px; font-weight: 700; color: var(--text); }
+.vcard-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.vcard-list::-webkit-scrollbar { width: 3px; }
+.vcard-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* 차량 카드 */
+.vcard {
+  position: relative; overflow: hidden;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.vcard::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 3px 0 0 3px;
+}
+.vcard[data-level="info"]::before   { background: var(--info); }
+.vcard[data-level="safe"]::before   { background: var(--safe); }
+.vcard[data-level="warn"]::before   { background: var(--warn); }
+.vcard[data-level="danger"]::before { background: var(--danger); }
+.vcard:hover { border-color: rgba(255,255,255,0.1); }
+.vcard.active {
+  border-color: rgba(47,168,255,0.45);
+  background: rgba(47,168,255,0.06);
+}
+.vc-r1 {
+  display: flex; justify-content: space-between;
+  align-items: flex-start; margin-bottom: 7px;
+}
+.vc-id {
+  font-family: var(--mono); font-size: 12px;
+  font-weight: 700; letter-spacing: 0.04em;
+}
+.vc-id[data-level="info"]   { color: var(--info); }
+.vc-id[data-level="safe"]   { color: var(--safe); }
+.vc-id[data-level="warn"]   { color: var(--warn); }
+.vc-id[data-level="danger"] { color: var(--danger); }
+.vc-type { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.vc-badge {
+  font-family: var(--mono); font-size: 8px;
+  padding: 2px 6px; border-radius: 3px; border: 1px solid;
+  white-space: nowrap;
+}
+.vc-badge[data-level="info"]   { background:rgba(47,168,255,0.1);  color:var(--info);   border-color:rgba(47,168,255,0.25); }
+.vc-badge[data-level="safe"]   { background:rgba(0,229,160,0.1);   color:var(--safe);   border-color:rgba(0,229,160,0.25); }
+.vc-badge[data-level="warn"]   { background:rgba(255,179,0,0.1);   color:var(--warn);   border-color:rgba(255,179,0,0.25); }
+.vc-badge[data-level="danger"] { background:rgba(255,68,34,0.1);   color:var(--danger); border-color:rgba(255,68,34,0.25); }
+.vc-coords {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); line-height: 1.75;
+}
+.vc-coords .lbl { color: var(--info); opacity: 0.75; }
+.vc-coords .val { color: var(--text); }
+.vc-r3 {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-top: 7px; padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+.vc-crew { font-size: 9px; color: var(--muted);
+           display: flex; align-items: center; gap: 4px; }
+.crew-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--info); }
+.vc-dist { font-family: var(--mono); font-size: 13px;
+           font-weight: 700; color: var(--warn); }
+
+/* ── 우 패널 ──────────────────────────────────────────────────── */
+#rightPanel {
+  position: absolute; top: 52px; right: 0; bottom: 0; width: 244px;
+  z-index: 100;
+  background: linear-gradient(270deg, rgba(6,8,16,0.98) 0%, rgba(6,8,16,0.87) 100%);
+  border-left: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  padding: 14px 13px;
+  display: flex; flex-direction: column; gap: 13px;
+  overflow-y: auto;
+}
+#rightPanel::-webkit-scrollbar { width: 3px; }
+#rightPanel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.rp-title {
+  font-family: var(--mono); font-size: 8px;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted); padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+/* 메트릭 2×2 */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mblock {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px;
+}
+.mb-label {
+  font-family: var(--mono); font-size: 8px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 4px;
+}
+.mb-val {
+  font-family: var(--mono); font-size: 27px;
+  font-weight: 700; line-height: 1;
+}
+.mb-val.safe   { color: var(--safe); }
+.mb-val.danger { color: var(--danger); }
+.mb-val.warn   { color: var(--warn); }
+.mb-val.info   { color: var(--info); }
+.mb-sub { font-size: 9px; color: var(--muted); margin-top: 2px; }
+/* 기술 연계 아이템 */
+.ti {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 8px 10px; margin-bottom: 5px;
+}
+.ti-h { display: flex; justify-content: space-between;
+        align-items: center; margin-bottom: 3px; }
+.ti-name { font-family: var(--mono); font-size: 10px;
+           font-weight: 600; color: var(--text); }
+.ti-badge {
+  font-family: var(--mono); font-size: 8px;
+  padding: 1px 5px; border-radius: 2px; border: 1px solid;
+}
+.ti-badge.safe   { background:rgba(0,229,160,0.12);  color:var(--safe);   border-color:rgba(0,229,160,0.3); }
+.ti-badge.info   { background:rgba(47,168,255,0.1);  color:var(--info);   border-color:rgba(47,168,255,0.25); }
+.ti-badge.warn   { background:rgba(255,179,0,0.1);   color:var(--warn);   border-color:rgba(255,179,0,0.25); }
+.ti-desc { font-size: 9px; color: var(--muted); line-height: 1.5; }
+/* 알림 로그 */
+.alert-item {
+  display: flex; gap: 7px; padding: 7px 9px;
+  border-radius: 4px; border-left: 3px solid;
+  background: var(--surface2); margin-bottom: 5px;
+  font-size: 10px; line-height: 1.4;
+}
+.alert-item.info   { border-color: var(--info); color: var(--text); }
+.alert-item.warn   { border-color: var(--warn); color: var(--warn); }
+.alert-item.danger { border-color: var(--danger); color: var(--danger); }
+.alert-time {
+  font-family: var(--mono); font-size: 8px;
+  color: var(--muted); white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── 하단바 ──────────────────────────────────────────────────── */
+#bottomBar {
+  position: absolute; bottom: 0;
+  left: 272px; right: 244px; height: 48px; z-index: 100;
+  background: linear-gradient(0deg, rgba(6,8,16,0.97) 0%, rgba(6,8,16,0.7) 100%);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center;
+  justify-content: center; gap: 7px;
+}
+.vbtn {
+  padding: 6px 14px; border-radius: 4px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  transition: all 0.14s;
+}
+.vbtn:hover { border-color: var(--text); color: var(--text); }
+.vbtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.bar-divider { width: 1px; height: 18px; background: var(--border); margin: 0 5px; }
+.bar-info {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  display: flex; align-items: center; gap: 5px;
+}
+.bar-info .lbl { color: var(--info); opacity: 0.7; }
+.bar-info .val { color: var(--text); }
+
+/* ── 화재 배지 ────────────────────────────────────────────────── */
+#incidentBadge {
+  position: absolute; top: 67px; left: 288px; z-index: 50;
+  background: rgba(255,68,34,0.1);
+  border: 1px solid rgba(255,68,34,0.35);
+  border-radius: 6px; padding: 8px 13px;
+  backdrop-filter: blur(8px); pointer-events: none;
+}
+.ib-title {
+  font-family: var(--mono); font-size: 11px;
+  font-weight: 700; color: var(--accent);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+}
+.ib-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  animation: blink 0.75s ease-in-out infinite;
+}
+.ib-sub { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+/* ── 정확도 오버레이 ──────────────────────────────────────────── */
+#accOverlay {
+  position: absolute; bottom: 63px; left: 288px; z-index: 50;
+  background: rgba(6,8,16,0.88); border: 1px solid var(--border);
+  border-radius: 6px; padding: 9px 13px;
+  backdrop-filter: blur(8px); pointer-events: none;
+  font-family: var(--mono); font-size: 9px;
+}
+.acc-row {
+  display: flex; justify-content: space-between;
+  gap: 18px; margin-bottom: 4px; color: var(--muted);
+}
+.acc-row:last-child { margin-bottom: 0; }
+.acc-lbl { color: var(--info); opacity: 0.7; }
+.acc-val { color: var(--text); }
