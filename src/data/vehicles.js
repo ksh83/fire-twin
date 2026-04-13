@@ -9,21 +9,19 @@ export const INCIDENT = {
 };
 
 // ── 상태 색상 (statusLevel → hex) ───────────────────────────
-// 차량 외곽 링 색상 = 운용 상태 표시
 export const STATUS_COLOR = {
-  info:   '#2fa8ff',  // 지휘 / 파랑
-  safe:   '#00e5a0',  // 정상 / 초록
-  warn:   '#ffb300',  // 경고 / 노랑
-  danger: '#ff4422',  // 위험 / 빨강
+  info:   '#2fa8ff',
+  safe:   '#00e5a0',
+  warn:   '#ffb300',
+  danger: '#ff4422',
 };
 
 // ── 소속 색상 (unit → hex) ───────────────────────────────────
-// 아이콘 배경색 = 소속 식별. 상태색과 색상환 최대 분리.
 export const UNIT_COLOR = {
-  CMD:  '#2fa8ff',  // 지휘차 (info 파랑 유지)
-  금암: '#0099dd',  // 금암소방서 — 청록
-  전미: '#dd6600',  // 전미소방서 — 주황
-  아중: '#9900cc',  // 아중소방서 — 보라
+  CMD:  '#2fa8ff',
+  금암: '#0099dd',
+  전미: '#dd6600',
+  아중: '#9900cc',
 };
 
 // ── 차종 약칭 (role → 아이콘 중앙 텍스트) ───────────────────
@@ -39,10 +37,11 @@ export const TYPE_ABBR = {
 };
 
 // ── 차량 13대 데이터 ─────────────────────────────────────────
-// unit        → 소속 (UNIT_COLOR 키)
-// shortLabel  → 지도 라벨 표시 문자열 (소속+차종+번호 약칭)
-// indoor      → true 시 GPS 음영, UWB 추적 전환
-// alt         → 실내 고도(m). 1층=0, 2층=3, 3층=6, 4층=9
+// members: 탑승 대원 개인 위치 추적 데이터
+//   id        → 대원 고유 ID (vehicleId-M번호)
+//   name      → 성명
+//   rank      → 계급
+//   oxygenPct → 공기호흡기 잔압 % (실내 진입 대원만 유효, 실외 null)
 export const VEHICLES = [
 
   // ── 지휘 ─────────────────────────────────────────────────
@@ -63,6 +62,10 @@ export const VEHICLES = [
     absCoord:    '35.8417°N, 127.1068°E',
     relCoord:    '기준차량 (0m)',
     dist:        '기준',
+    members: [
+      { id: 'CMD-1-M1', name: '이현수', rank: '소방령', oxygenPct: null },
+      { id: 'CMD-1-M2', name: '박재훈', rank: '소방사', oxygenPct: null },
+    ],
   },
 
   // ── 금암소방서 (7대) ──────────────────────────────────────
@@ -83,6 +86,12 @@ export const VEHICLES = [
     absCoord:    '35.8428°N, 127.1070°E',
     relCoord:    '북 122m / 358°',
     dist:        '122m',
+    members: [
+      { id: 'GA-PMP1-M1', name: '김성호', rank: '소방장', oxygenPct: null },
+      { id: 'GA-PMP1-M2', name: '이준서', rank: '소방교', oxygenPct: null },
+      { id: 'GA-PMP1-M3', name: '최민준', rank: '소방사', oxygenPct: null },
+      { id: 'GA-PMP1-M4', name: '정도현', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'GA-PMP2',
@@ -101,6 +110,12 @@ export const VEHICLES = [
     absCoord:    '35.8413°N, 127.1065°E',
     relCoord:    '남서 57m / 219°',
     dist:        '57m',
+    members: [
+      { id: 'GA-PMP2-M1', name: '박정우', rank: '소방장', oxygenPct: null },
+      { id: 'GA-PMP2-M2', name: '손유민', rank: '소방교', oxygenPct: null },
+      { id: 'GA-PMP2-M3', name: '윤기준', rank: '소방사', oxygenPct: null },
+      { id: 'GA-PMP2-M4', name: '임태양', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'GA-AMB1',
@@ -119,6 +134,10 @@ export const VEHICLES = [
     absCoord:    '35.8432°N, 127.1072°E',
     relCoord:    '북 166m / 3°',
     dist:        '166m',
+    members: [
+      { id: 'GA-AMB1-M1', name: '강지현', rank: '소방교', oxygenPct: null },
+      { id: 'GA-AMB1-M2', name: '한소희', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'GA-AMB2',
@@ -137,6 +156,10 @@ export const VEHICLES = [
     absCoord:    '35.8409°N, 127.1062°E',
     relCoord:    '남서 138m / 228°',
     dist:        '138m',
+    members: [
+      { id: 'GA-AMB2-M1', name: '신예린', rank: '소방교', oxygenPct: null },
+      { id: 'GA-AMB2-M2', name: '조민서', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'GA-TNK',
@@ -155,6 +178,11 @@ export const VEHICLES = [
     absCoord:    '35.8420°N, 127.1055°E',
     relCoord:    '서 266m / 270°',
     dist:        '266m',
+    members: [
+      { id: 'GA-TNK-M1', name: '권병수', rank: '소방교', oxygenPct: null },
+      { id: 'GA-TNK-M2', name: '나동훈', rank: '소방사', oxygenPct: null },
+      { id: 'GA-TNK-M3', name: '오성철', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'GA-FLX',
@@ -165,14 +193,20 @@ export const VEHICLES = [
     role:        'flex',
     lon:         127.1083,
     lat:         35.8427,
-    alt:         6.0,     // 3층 진입 (층고 3m × 2층)
-    indoor:      true,    // ← UWB 추적 중
+    alt:         6.0,
+    indoor:      true,
     status:      '건물 3F 진입',
     statusLevel: 'danger',
     crew:        3,
     absCoord:    'GPS 음영 (실내)',
     relCoord:    'UWB: 북동 20m / 고도 +6.0m',
     dist:        '20m↑',
+    members: [
+      // 실내 진입 → 공기호흡기 잔압 추적
+      { id: 'GA-FLX-M1', name: '최원준', rank: '소방장', oxygenPct: 22 },
+      { id: 'GA-FLX-M2', name: '서재민', rank: '소방사', oxygenPct: 24 },
+      { id: 'GA-FLX-M3', name: '홍성빈', rank: '소방사', oxygenPct: 20 },
+    ],
   },
   {
     id:          'GA-ARL',
@@ -191,6 +225,11 @@ export const VEHICLES = [
     absCoord:    '35.8430°N, 127.1078°E',
     relCoord:    '북 122m / 13°',
     dist:        '122m',
+    members: [
+      { id: 'GA-ARL-M1', name: '백승호', rank: '소방교', oxygenPct: null },
+      { id: 'GA-ARL-M2', name: '유시완', rank: '소방사', oxygenPct: null },
+      { id: 'GA-ARL-M3', name: '방준형', rank: '소방사', oxygenPct: null },
+    ],
   },
 
   // ── 전미소방서 (2대) ──────────────────────────────────────
@@ -211,6 +250,12 @@ export const VEHICLES = [
     absCoord:    '35.8428°N, 127.1098°E',
     relCoord:    '북동 148m / 55°',
     dist:        '148m',
+    members: [
+      { id: 'JM-PMP-M1', name: '노태혁', rank: '소방장', oxygenPct: null },
+      { id: 'JM-PMP-M2', name: '변성준', rank: '소방교', oxygenPct: null },
+      { id: 'JM-PMP-M3', name: '구재원', rank: '소방사', oxygenPct: null },
+      { id: 'JM-PMP-M4', name: '하민성', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'JM-AMB',
@@ -229,6 +274,10 @@ export const VEHICLES = [
     absCoord:    '35.8420°N, 127.1110°E',
     relCoord:    '동 221m / 90°',
     dist:        '221m',
+    members: [
+      { id: 'JM-AMB-M1', name: '맹유진', rank: '소방교', oxygenPct: null },
+      { id: 'JM-AMB-M2', name: '전혜원', rank: '소방사', oxygenPct: null },
+    ],
   },
 
   // ── 아중소방서 (3대) ──────────────────────────────────────
@@ -249,6 +298,12 @@ export const VEHICLES = [
     absCoord:    '35.8410°N, 127.1092°E',
     relCoord:    '남동 122m / 140°',
     dist:        '122m',
+    members: [
+      { id: 'AJ-PMP-M1', name: '류승현', rank: '소방장', oxygenPct: null },
+      { id: 'AJ-PMP-M2', name: '마재영', rank: '소방교', oxygenPct: null },
+      { id: 'AJ-PMP-M3', name: '탁민준', rank: '소방사', oxygenPct: null },
+      { id: 'AJ-PMP-M4', name: '제갈현', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'AJ-AMB',
@@ -267,6 +322,10 @@ export const VEHICLES = [
     absCoord:    '35.8405°N, 127.1086°E',
     relCoord:    '남 166m / 178°',
     dist:        '166m',
+    members: [
+      { id: 'AJ-AMB-M1', name: '선예진', rank: '소방교', oxygenPct: null },
+      { id: 'AJ-AMB-M2', name: '팽수아', rank: '소방사', oxygenPct: null },
+    ],
   },
   {
     id:          'AJ-SLD',
@@ -285,6 +344,10 @@ export const VEHICLES = [
     absCoord:    '35.8412°N, 127.1100°E',
     relCoord:    '남동 178m / 128°',
     dist:        '178m',
+    members: [
+      { id: 'AJ-SLD-M1', name: '은태원', rank: '소방교', oxygenPct: null },
+      { id: 'AJ-SLD-M2', name: '위준서', rank: '소방사', oxygenPct: null },
+    ],
   },
 ];
 

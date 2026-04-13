@@ -4,7 +4,6 @@ import {
 
 // ── HTML 구조 전체를 #app에 주입 ────────────────────────────
 export function buildLayout() {
-  // 차량 데이터에서 수량 계산 (하드코딩 제거)
   const totalCrew    = VEHICLES.reduce((s, v) => s + v.crew, 0);
   const indoorVeh    = VEHICLES.filter(v => v.indoor);
   const indoorCrew   = indoorVeh.reduce((s, v) => s + v.crew, 0);
@@ -35,24 +34,34 @@ export function buildLayout() {
       </div>
       <div class="top-status">
         <div class="ts-item">
+          <span class="ts-dot" id="ts-dot-ws"></span>
+          <span id="ts-ws-label">WebSocket</span>
+          <span class="ts-val" id="ts-ws-val">연결중...</span>
+        </div>
+        <div class="ts-item">
           <span class="ts-dot"></span>
-          <span>차량추적</span><span class="ts-val">${vehicleCount} / ${vehicleCount}</span>
+          <span>차량추적</span>
+          <span class="ts-val" id="ts-vehicle-count">${vehicleCount} / ${vehicleCount}</span>
         </div>
         <div class="ts-item">
           <span class="ts-dot danger"></span>
-          <span>실내대원</span><span class="ts-val">${indoorCrew}명</span>
+          <span>실내대원</span>
+          <span class="ts-val">${indoorCrew}명</span>
         </div>
         <div class="ts-item">
           <span class="ts-dot"></span>
-          <span>OSM 3D</span><span class="ts-val">활성</span>
+          <span>OSM 3D</span>
+          <span class="ts-val">활성</span>
         </div>
         <div class="ts-item">
           <span class="ts-dot warn"></span>
-          <span>V-World</span><span class="ts-val">연결중</span>
+          <span>V-World</span>
+          <span class="ts-val" id="ts-vworld-val">키 대기</span>
         </div>
         <div class="ts-item">
           <span class="ts-dot"></span>
-          <span>갱신주기</span><span class="ts-val">250ms</span>
+          <span>갱신주기</span>
+          <span class="ts-val">250ms</span>
         </div>
       </div>
       <div class="top-clock" id="clock">00:00:00</div>
@@ -83,7 +92,7 @@ export function buildLayout() {
         </div>
         <div class="mblock">
           <div class="mb-label">차량</div>
-          <div class="mb-val warn">${vehicleCount}</div>
+          <div class="mb-val warn" id="metric-vehicle-count">${vehicleCount}</div>
           <div class="mb-sub">대 배치</div>
         </div>
         <div class="mblock">
@@ -107,11 +116,9 @@ export function buildLayout() {
 
       <div>
         <div class="rp-title">현장 알림</div>
-        ${ALERTS.map(a => `
-          <div class="alert-item ${a.level}">
-            <div class="alert-time">${a.time}</div>
-            <div>${a.text}</div>
-          </div>`).join('')}
+        <div id="alertList">
+          ${ALERTS.map(_renderAlert).join('')}
+        </div>
       </div>
     </div>
 
@@ -123,6 +130,7 @@ export function buildLayout() {
       <div class="bar-divider"></div>
       <button class="vbtn" id="btn-bldg">건물 투명화</button>
       <button class="vbtn" id="btn-fire">화재건물 🎯</button>
+      <button class="vbtn" id="btn-cluster">클러스터 ON</button>
       <div class="bar-divider"></div>
       <div class="bar-info">
         <span class="lbl">좌표계</span><span class="val">WGS84</span>
@@ -141,23 +149,24 @@ export function buildLayout() {
     <div id="accOverlay">
       <div class="acc-row"><span class="acc-lbl">GPS 정확도</span><span class="acc-val">±3.2m</span></div>
       <div class="acc-row"><span class="acc-lbl">UWB 정확도</span><span class="acc-val">±18cm</span></div>
-      <div class="acc-row"><span class="acc-lbl">통신 지연</span><span class="acc-val">42ms</span></div>
-      <div class="acc-row"><span class="acc-lbl">3D 소스</span><span class="acc-val">OSM</span></div>
+      <div class="acc-row"><span class="acc-lbl">통신 지연</span><span class="acc-val" id="acc-latency">42ms</span></div>
+      <div class="acc-row"><span class="acc-lbl">3D 소스</span><span class="acc-val" id="acc-source">OSM</span></div>
     </div>
   `;
 }
 
-// ── 차량 카드 목록 렌더링 ────────────────────────────────────
-export function renderVehicleCards(onSelect) {
-  const list = document.getElementById('vcardList');
-  if (!list) return;
-  list.innerHTML = VEHICLES.map(v => `
-    <div
-      class="vcard"
-      id="vc-${v.id}"
-      data-level="${v.statusLevel}"
-      data-id="${v.id}"
-    >
+// ── 알림 항목 HTML ────────────────────────────────────────────
+function _renderAlert(a) {
+  return `<div class="alert-item ${a.level}">
+    <div class="alert-time">${a.time}</div>
+    <div>${a.text}</div>
+  </div>`;
+}
+
+// ── 차량 카드 HTML ────────────────────────────────────────────
+function _renderVehicleCard(v) {
+  return `
+    <div class="vcard" id="vc-${v.id}" data-level="${v.statusLevel}" data-id="${v.id}">
       <div class="vc-r1">
         <div>
           <div class="vc-id" data-level="${v.statusLevel}">
@@ -172,15 +181,45 @@ export function renderVehicleCards(onSelect) {
         <div><span class="lbl">REL </span><span class="val">${v.relCoord}</span></div>
       </div>
       <div class="vc-r3">
-        <div class="vc-crew">
-          <span class="crew-pip"></span>${v.crew}명 탑승
-        </div>
+        <div class="vc-crew"><span class="crew-pip"></span>${v.crew}명 탑승</div>
         <div class="vc-dist">${v.dist}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+}
 
-  // 클릭 이벤트 위임
+// ── 차량 카드 목록 렌더링 ────────────────────────────────────
+export function renderVehicleCards(onSelect) {
+  const list = document.getElementById('vcardList');
+  if (!list) return;
+  list.innerHTML = VEHICLES.map(_renderVehicleCard).join('');
+  _bindCardClick(list, onSelect);
+}
+
+// ── 동적 차량 카드 추가 (WebSocket init/vehicle_add) ─────────
+export function addVehicleCard(vehicle, onSelect) {
+  const list = document.getElementById('vcardList');
+  if (!list) return;
+  // 이미 존재하면 스킵
+  if (document.getElementById(`vc-${vehicle.id}`)) return;
+
+  list.insertAdjacentHTML('beforeend', _renderVehicleCard(vehicle));
+  _bindCardClick(list, onSelect);
+
+  // 카운트 업데이트
+  const countEl = document.getElementById('ts-vehicle-count');
+  const metricEl = document.getElementById('metric-vehicle-count');
+  if (countEl) {
+    const current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = `${current + 1} / ${current + 1}`;
+  }
+  if (metricEl) metricEl.textContent = String(parseInt(metricEl.textContent || '0') + 1);
+}
+
+// ── 카드 클릭 이벤트 위임 (중복 방지) ───────────────────────
+let _cardClickBound = false;
+function _bindCardClick(list, onSelect) {
+  if (_cardClickBound) return;
+  _cardClickBound = true;
   list.addEventListener('click', e => {
     const card = e.target.closest('.vcard');
     if (!card) return;
@@ -190,12 +229,88 @@ export function renderVehicleCards(onSelect) {
   });
 }
 
+// ── 차량 카드 상태 업데이트 ──────────────────────────────────
+export function updateVehicleCard(id, status, statusLevel) {
+  const card = document.getElementById(`vc-${id}`);
+  if (!card) return;
+  card.dataset.level = statusLevel;
+  const badge = card.querySelector('.vc-badge');
+  const idEl  = card.querySelector('.vc-id');
+  if (badge) { badge.textContent = status; badge.dataset.level = statusLevel; }
+  if (idEl)  idEl.dataset.level = statusLevel;
+}
+
+// ── 실시간 좌표 갱신 ─────────────────────────────────────────
+export function updateVehicleCoords(id, lon, lat, alt, vehicle) {
+  const card = document.getElementById(`vc-${id}`);
+  if (!card) return;
+  const coordEl = card.querySelector('.vc-coords');
+  if (!coordEl) return;
+
+  const absText = vehicle.indoor
+    ? 'GPS 음영 (UWB 추적중)'
+    : `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+
+  coordEl.innerHTML = `
+    <div><span class="lbl">ABS </span><span class="val">${absText}</span></div>
+    <div><span class="lbl">REL </span><span class="val">${vehicle.relCoord}</span></div>
+  `;
+}
+
+// ── 새 알림 추가 ─────────────────────────────────────────────
+export function pushAlert(alert) {
+  const list = document.getElementById('alertList');
+  if (!list) return;
+
+  const now  = new Date();
+  const time = alert.time
+    || `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const el = document.createElement('div');
+  el.className = `alert-item ${alert.level}`;
+  el.innerHTML = `<div class="alert-time">${time}</div><div>${alert.text}</div>`;
+
+  // 최신 알림을 맨 위에
+  list.prepend(el);
+
+  // 최대 20개 유지
+  while (list.children.length > 20) list.removeChild(list.lastChild);
+}
+
+// ── WebSocket 연결 상태 표시 ─────────────────────────────────
+export function setWsStatus(connected) {
+  const dot = document.getElementById('ts-dot-ws');
+  const val = document.getElementById('ts-ws-val');
+  if (!dot || !val) return;
+
+  if (connected) {
+    dot.className = 'ts-dot';          // safe (초록)
+    val.textContent = '연결됨';
+  } else {
+    dot.className = 'ts-dot warn';     // warn (노랑)
+    val.textContent = '시뮬레이션';
+  }
+}
+
+// ── V-World 상태 표시 ────────────────────────────────────────
+export function setVWorldStatus(active) {
+  const val = document.getElementById('ts-vworld-val');
+  const dot = val?.closest('.ts-item')?.querySelector('.ts-dot');
+  if (!val) return;
+  if (active) {
+    val.textContent = '활성';
+    if (dot) dot.className = 'ts-dot';
+    const srcEl = document.getElementById('acc-source');
+    if (srcEl) srcEl.textContent = 'V-World';
+  } else {
+    val.textContent = '키 대기';
+  }
+}
+
 // ── 시계 갱신 ────────────────────────────────────────────────
 export function startClock() {
   const el = document.getElementById('clock');
-  const tick = () => {
-    if (el) el.textContent = new Date().toTimeString().slice(0, 8);
-  };
+  const tick = () => { if (el) el.textContent = new Date().toTimeString().slice(0, 8); };
   tick();
   setInterval(tick, 1000);
 }
@@ -208,8 +323,7 @@ export function startElapsed(initialSec = 2 * 60 + 14) {
     sec++;
     const m = Math.floor(sec / 60);
     const s = sec % 60;
-    if (el) el.textContent =
-      String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    if (el) el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
   }, 1000);
 }
 
