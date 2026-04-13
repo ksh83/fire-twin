@@ -9,8 +9,13 @@ import {
   updateVehicleCard, updateVehicleCoords,
   pushAlert, setWsStatus, setVWorldStatus,
 } from './ui.js';
-import { startSimulation } from './simulation.js';
+import { startSimulation, setScenarioMode } from './simulation.js';
 import { initVWorldLayer } from './layers/vworld.js';
+import { ScenarioEngine } from './scenario/engine.js';
+import {
+  injectScenarioUI, bindScenarioPanel,
+  updateScenarioTime, showCaption, getStationMarkers,
+} from './scenario/panel.js';
 
 // ── 1. HTML 레이아웃 주입 ────────────────────────────────────
 buildLayout();
@@ -571,3 +576,121 @@ function _onPositionUpdate(id, lon, lat, alt) {
   if (!v) return;
   updateVehicleCoords(id, lon, lat, alt, v);
 }
+
+// ── 소방서 마커 (시나리오용) ─────────────────────────────────
+function _addStationMarkers() {
+  const stations = getStationMarkers();
+  Object.entries(stations).forEach(([unit, st]) => {
+    viewer.entities.add({
+      id:       `station-${unit}`,
+      name:     st.name,
+      position: Cesium.Cartesian3.fromDegrees(st.lon, st.lat, 5),
+      billboard: {
+        image: _makeStationCanvas(unit),
+        width: 48, height: 48,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      label: {
+        text: st.name,
+        font: 'bold 11px "Malgun Gothic", "Noto Sans KR", monospace',
+        fillColor: Cesium.Color.fromCssColorString('#dde4ee'),
+        outlineColor: Cesium.Color.fromCssColorString('#060810'),
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,
+        pixelOffset: new Cesium.Cartesian2(0, 6),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+    });
+  });
+}
+
+function _makeStationCanvas(unit) {
+  const UNIT_COL = { 금암: '#0099dd', 전미: '#dd6600', 아중: '#9900cc' };
+  const col = UNIT_COL[unit] || '#888888';
+  const c   = document.createElement('canvas');
+  c.width = 48; c.height = 48;
+  const ctx = c.getContext('2d');
+
+  // 소방서 아이콘 (육각형)
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 6;
+    const x = 24 + 20 * Math.cos(a);
+    const y = 24 + 20 * Math.sin(a);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = col + 'bb';
+  ctx.fill();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 중앙 텍스트 (소) - 소방서 약칭
+  ctx.font = 'bold 14px "Malgun Gothic", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('소', 24, 24);
+
+  return c.toDataURL();
+}
+
+// ── 시나리오 엔진 초기화 ─────────────────────────────────────
+const scenario = new ScenarioEngine({
+  // 차량 위치 갱신
+  onPositionUpdate(id, lon, lat, alt) {
+    const entity = vehicleEntities[id];
+    if (entity) entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+    _onPositionUpdate(id, lon, lat, alt);
+  },
+
+  // 대원 위치 갱신
+  onMemberPosition(id, lon, lat, alt) {
+    const rec = memberEntities[id];
+    if (rec?.entity) rec.entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+  },
+
+  // 차량 상태 변경
+  onStatusChange: _updateEntityStatus,
+
+  // 알림
+  onAlert: pushAlert,
+
+  // 자막
+  onCaption: showCaption,
+
+  // 타임라인 진행률 갱신
+  onTimeUpdate: updateScenarioTime,
+
+  // 카메라 이벤트
+  onCamera(target) {
+    if (target === 'incident') flyToIncident();
+  },
+
+  // 초기화
+  onReset() {
+    // 로컬 시뮬레이션 재개
+    setScenarioMode(false);
+  },
+});
+
+scenario.setVehicleDataMap(vehicleDataMap);
+
+// 소방서 마커 추가
+_addStationMarkers();
+
+// 시나리오 UI 주입 + 버튼 바인딩
+injectScenarioUI();
+bindScenarioPanel(scenario);
+
+// 재생 시작 시 시뮬레이션 억제
+const _origPlay = scenario.play.bind(scenario);
+scenario.play = function () {
+  setScenarioMode(true);
+  _origPlay();
+};

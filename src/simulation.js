@@ -28,6 +28,12 @@ let _vehicleEntities = {};
 let _callbacks       = {};
 let _wsMode          = false;
 let _simTimer        = null;
+let _scenarioMode    = false;  // true 시 시뮬레이션 위치 업데이트 억제
+
+// ── 시나리오 모드 전환 ───────────────────────────────────────
+export function setScenarioMode(active) {
+  _scenarioMode = active;
+}
 
 // ── 진입점 ───────────────────────────────────────────────────
 /**
@@ -179,6 +185,9 @@ function _startLocalSim() {
 
   _simTimer = setInterval(() => {
     simTime += 0.25;
+
+    // 시나리오 모드 활성 시 위치 업데이트 억제
+    if (_scenarioMode) return;
 
     VEHICLES.forEach(v => {
       const ph = vPhase[v.id];

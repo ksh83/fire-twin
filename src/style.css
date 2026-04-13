@@ -262,6 +262,96 @@ html, body { width: 100%; height: 100%; overflow: hidden;
   color: var(--muted); white-space: nowrap; flex-shrink: 0; margin-top: 1px;
 }
 
+/* ── 시나리오 컨트롤 패널 ─────────────────────────────────────── */
+#scenarioPanel {
+  position: absolute;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  background: rgba(6,8,16,0.96);
+  border: 1px solid rgba(47,168,255,0.3);
+  border-radius: 8px;
+  padding: 10px 16px 8px;
+  backdrop-filter: blur(14px);
+  min-width: 480px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+.sc-row { display: flex; align-items: center; gap: 10px; }
+.sc-top { margin-bottom: 8px; justify-content: space-between; }
+.sc-title {
+  font-family: var(--mono); font-size: 11px;
+  font-weight: 700; color: var(--info); letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.sc-speeds { display: flex; gap: 4px; }
+.sc-speed {
+  padding: 3px 8px; border-radius: 3px;
+  font-family: var(--mono); font-size: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); transition: all 0.12s;
+}
+.sc-speed:hover { border-color: var(--info); color: var(--info); }
+.sc-speed-active { background: var(--info) !important; border-color: var(--info) !important; color: #fff !important; }
+.sc-btns { display: flex; gap: 6px; }
+.sc-btn {
+  padding: 5px 14px; border-radius: 4px;
+  font-family: var(--mono); font-size: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); transition: all 0.12s;
+  letter-spacing: 0.06em;
+}
+.sc-btn:hover { border-color: var(--text); color: var(--text); }
+.sc-play { border-color: var(--info); color: var(--info); }
+.sc-play:hover { background: rgba(47,168,255,0.12); }
+.sc-play.sc-playing { background: var(--info); color: #fff; }
+.sc-bar-row { gap: 8px; margin-bottom: 6px; }
+.sc-time {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); white-space: nowrap; min-width: 36px;
+}
+.sc-track {
+  flex: 1; height: 4px; background: var(--border);
+  border-radius: 2px; position: relative; cursor: pointer;
+}
+.sc-fill {
+  height: 100%; background: var(--info);
+  border-radius: 2px; width: 0%; transition: width 0.1s linear;
+}
+.sc-thumb {
+  position: absolute; top: 50%; left: 0%;
+  transform: translate(-50%, -50%);
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--info); border: 2px solid var(--bg);
+  transition: left 0.1s linear;
+}
+.sc-event {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.05em;
+  text-align: center; min-height: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── 화면 중앙 자막 (촬영용) ─────────────────────────────────── */
+#scenarioCaption {
+  position: absolute;
+  bottom: 115px;
+  left: 50%; transform: translateX(-50%);
+  z-index: 200;
+  background: rgba(6,8,16,0.85);
+  border: 1px solid rgba(47,168,255,0.4);
+  border-radius: 6px;
+  padding: 10px 22px;
+  font-family: var(--mono); font-size: 16px;
+  font-weight: 700; color: var(--text);
+  letter-spacing: 0.08em; white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  backdrop-filter: blur(10px);
+}
+#scenarioCaption.visible { opacity: 1; }
+
 /* ── WebSocket 상태 점 (setWsStatus로 제어) ─────────────────── */
 /* 연결됨 → .ts-dot (기본 safe 초록) */
 /* 시뮬레이션 → .ts-dot.warn (노랑) */
