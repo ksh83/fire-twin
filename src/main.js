@@ -100,6 +100,96 @@ tacticalDS.clustering.clusterEvent.addEventListener((clusteredEntities, cluster)
 
 // ── 7. 아이콘 생성 헬퍼 ─────────────────────────────────────
 
+/* AIP 관련 상수 및 유틸리티 (Step 5 - 순서 정정) */
+const hydrantEntities = {};
+const aipLines = {}; // 차량별 추천 경로 가이드 라인
+
+function _makeHydrantCanvas(h) {
+  const c = document.createElement('canvas');
+  c.width = 48; c.height = 48;
+  const ctx = c.getContext('2d');
+  const col = h.status === '사용가능' ? '#2fa8ff' : '#9ca3af';
+  ctx.beginPath(); ctx.moveTo(24, 4);
+  ctx.bezierCurveTo(40, 24, 40, 44, 24, 44);
+  ctx.bezierCurveTo(8, 44, 8, 24, 24, 4);
+  ctx.fillStyle = col + 'cc'; ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.font = 'bold 16px "IBM Plex Mono", sans-serif';
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('H', 24, 28);
+  return c.toDataURL();
+}
+
+function _addHydrantEntities() {
+  HYDRANTS.forEach(h => {
+    const entity = viewer.entities.add({
+      id: `hydrant-${h.id}`,
+      name: `소화전 ${h.id} (${h.type})`,
+      position: Cesium.Cartesian3.fromDegrees(h.lon, h.lat, 0),
+      billboard: {
+        image: _makeHydrantCanvas(h),
+        width: 32, height: 32,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      label: {
+        text: `${h.id}\n${h.status}`,
+        font: 'bold 10px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,
+        pixelOffset: new Cesium.Cartesian2(0, 4),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    hydrantEntities[h.id] = entity;
+  });
+}
+
+function _checkAIPRecommendations(id) {
+  const v = vehicleDataMap[id];
+  if (!v || v.waterLevel == null || v.role === 'amb' || v.role === 'command') return;
+  if (v.waterLevel < 0.3) {
+    if (v._aipAlerted) return;
+    v._aipAlerted = true;
+    let minD = Infinity, bestH = null;
+    HYDRANTS.filter(h => h.status === '사용가능').forEach(h => {
+      const d = _calcDist(v.lat, v.lon, h.lat, h.lon);
+      if (d < minD) { minD = d; bestH = h; }
+    });
+    if (bestH) {
+      pushAlert({
+        level: 'warn',
+        text: `[AIP 추천] 용수 부족(${v.shortLabel}) - 최단거리 ${bestH.id} 소화전(${minD}m) 점유 권장`
+      });
+      if (aipLines[v.id]) viewer.entities.remove(aipLines[v.id]);
+      aipLines[v.id] = viewer.entities.add({
+        polyline: {
+          positions: new Cesium.CallbackProperty(() => {
+            const hPos = Cesium.Cartesian3.fromDegrees(bestH.lon, bestH.lat, 2);
+            const vPos = Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 2);
+            return [vPos, hPos];
+          }, false),
+          width: 3,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: Cesium.Color.fromCssColorString('#2fa8ff'),
+            dashLength: 12,
+          }),
+        }
+      });
+    }
+  } else {
+    v._aipAlerted = false;
+    if (aipLines[v.id]) {
+      viewer.entities.remove(aipLines[v.id]);
+      delete aipLines[v.id];
+    }
+  }
+}
+
 /* roundRect 폴리필 */
 function _rr(ctx, x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
@@ -1028,118 +1118,6 @@ function _makeStationCanvas(unit) {
   ctx.fillText('소', 24, 24);
 
   return c.toDataURL();
-}
-
-// ── 18. AIP 추천 엔진 & 소화전 레이어 (Step 5) ─────────────
-const hydrantEntities = {};
-const aipLines = {}; // 차량별 추천 경로 가이드 라인
-
-function _makeHydrantCanvas(h) {
-  const c = document.createElement('canvas');
-  c.width = 48; c.height = 48;
-  const ctx = c.getContext('2d');
-  const col = h.status === '사용가능' ? '#2fa8ff' : '#9ca3af';
-
-  // 물방울 배경
-  ctx.beginPath();
-  ctx.moveTo(24, 4);
-  ctx.bezierCurveTo(40, 24, 40, 44, 24, 44);
-  ctx.bezierCurveTo(8, 44, 8, 24, 24, 4);
-  ctx.fillStyle = col + 'cc'; ctx.fill();
-  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
-
-  // 중앙 'H' 마커
-  ctx.font = 'bold 16px "IBM Plex Mono", sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('H', 24, 28);
-
-  return c.toDataURL();
-}
-
-function _addHydrantEntities() {
-  HYDRANTS.forEach(h => {
-    const entity = viewer.entities.add({
-      id: `hydrant-${h.id}`,
-      name: `소화전 ${h.id} (${h.type})`,
-      position: Cesium.Cartesian3.fromDegrees(h.lon, h.lat, 0),
-      billboard: {
-        image: _makeHydrantCanvas(h),
-        width: 32, height: 32,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-      },
-      label: {
-        text: `${h.id}\n${h.status}`,
-        font: 'bold 10px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.TOP,
-        pixelOffset: new Cesium.Cartesian2(0, 4),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-    });
-    hydrantEntities[h.id] = entity;
-  });
-}
-
-/**
- * AIP 의사결정 지원: 수원 부족 차량 발생 시 가장 가까운 소화전 추천
- */
-function _checkAIPRecommendations(id) {
-  const v = vehicleDataMap[id];
-  if (!v || v.waterLevel == null || v.role === 'amb' || v.role === 'command') return;
-
-  // 1. 수원 부족 임계치 (30%) 체크
-  if (v.waterLevel < 0.3) {
-    // 이미 알림이 나갔는지 체크 (중복 방지)
-    if (v._aipAlerted) return;
-    v._aipAlerted = true;
-
-    // 2. 가용 소화전 중 최단거리 탐색
-    let minD = Infinity;
-    let bestH = null;
-
-    HYDRANTS.filter(h => h.status === '사용가능').forEach(h => {
-      const d = _calcDist(v.lat, v.lon, h.lat, h.lon);
-      if (d < minD) { minD = d; bestH = h; }
-    });
-
-    if (bestH) {
-      // 3. 알림 출력
-      pushAlert({
-        level: 'warn',
-        text: `[AIP 추천] 용수 부족(${v.shortLabel}) - 최단거리 ${bestH.id} 소화전(${minD}m) 점유 권장`
-      });
-
-      // 4. 지도상 점선 가이드 생성
-      if (aipLines[v.id]) viewer.entities.remove(aipLines[v.id]);
-      aipLines[v.id] = viewer.entities.add({
-        polyline: {
-          positions: new Cesium.CallbackProperty(() => {
-            const hPos = Cesium.Cartesian3.fromDegrees(bestH.lon, bestH.lat, 2);
-            const vPos = Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 2);
-            return [vPos, hPos];
-          }, false),
-          width: 3,
-          material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.fromCssColorString('#2fa8ff'),
-            dashLength: 12,
-          }),
-        }
-      });
-    }
-  } else {
-    // 수원 충전 시 알림 상태 초기화 및 라인 제거
-    v._aipAlerted = false;
-    if (aipLines[v.id]) {
-      viewer.entities.remove(aipLines[v.id]);
-      delete aipLines[v.id];
-    }
-  }
 }
 
 // ── 시나리오 엔진 초기화 ─────────────────────────────────────
