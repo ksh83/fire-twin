@@ -2,7 +2,7 @@ import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import './style.css';
 
-import { VEHICLES, INCIDENT, STATUS_COLOR, UNIT_COLOR, TYPE_ABBR } from './data/vehicles.js';
+import { VEHICLES, INCIDENT, HYDRANTS, STATUS_COLOR, UNIT_COLOR, TYPE_ABBR } from './data/vehicles.js';
 import {
   buildLayout, renderVehicleCards, addVehicleCard,
   startClock, startElapsed, hideLoading,
@@ -280,11 +280,11 @@ function _makeVehicleCanvas(v) {
   const unitCol = UNIT_COLOR[v.unit] || '#888888';
   const statCol = STATUS_COLOR[v.statusLevel] || '#ffffff';
 
-  // 외곽 헤일로
+  // 1. 외곽 헤일로
   ctx.beginPath(); ctx.arc(40, 40, 38, 0, Math.PI * 2);
   ctx.fillStyle = unitCol + '18'; ctx.fill();
 
-  // 내부 배경 (클리핑)
+  // 2. 내부 배경 (클리핑)
   ctx.save();
   ctx.beginPath(); ctx.arc(40, 40, 34, 0, Math.PI * 2);
   ctx.clip();
@@ -304,13 +304,39 @@ function _makeVehicleCanvas(v) {
   (drawFns[v.role] || drawFns.pump)();
   ctx.restore();
 
-  // 상태 링
+  // 3. 잔량 게이지 (AIP 기초 - Step 5)
+  // 실내 진입 대원 있을 시 산소 평균, 아니면 용수 잔량 사용
+  let gaugePct = v.waterLevel ?? 1.0;
+  if (v.indoor && v.members && v.members.length > 0) {
+    const oxyMembers = v.members.filter(m => m.oxygenPct != null);
+    if (oxyMembers.length > 0) {
+      gaugePct = oxyMembers.reduce((sum, m) => sum + m.oxygenPct, 0) / (oxyMembers.length * 100);
+    }
+  }
+
+  const gaugeCol = gaugePct < 0.3 ? STATUS_COLOR.danger : gaugePct < 0.8 ? STATUS_COLOR.warn : STATUS_COLOR.safe;
+  
+  // 배경 회색 아크 (전체 270도)
+  ctx.beginPath();
+  ctx.arc(40, 40, 31, -Math.PI * 1.25, Math.PI * 0.25);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // 활성 잔량 아크
+  ctx.beginPath();
+  ctx.arc(40, 40, 31, -Math.PI * 1.25, -Math.PI * 1.25 + (Math.PI * 1.5 * gaugePct));
+  ctx.strokeStyle = gaugeCol;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // 4. 상태 링
   ctx.beginPath(); ctx.arc(40, 40, 37, 0, Math.PI * 2);
   ctx.strokeStyle = statCol;
   ctx.lineWidth = v.statusLevel === 'danger' ? 5 : 3;
   ctx.stroke();
 
-  // 실내 층 배지
+  // 5. 실내 층 배지
   if (v.indoor) {
     const floor = Math.round(v.alt / 3) + 1;
     ctx.beginPath(); ctx.arc(62, 16, 11, 0, Math.PI * 2);
@@ -573,6 +599,8 @@ function _updateBearingLine(id, lon, lat) {
 
 function _makeVehicleDescription(v) {
   const statCol = STATUS_COLOR[v.statusLevel] || '#ffffff';
+  const waterPct = v.waterLevel != null ? Math.round(v.waterLevel * 100) : null;
+  
   return `
     <div style="font-family:'IBM Plex Mono',monospace;background:#0c1018;
                 color:#dde4ee;padding:13px;border-radius:6px;min-width:210px;">
@@ -581,6 +609,10 @@ function _makeVehicleDescription(v) {
       <table style="font-size:10px;width:100%;border-collapse:collapse;">
         <tr><td style="color:#2fa8ff;padding:2px 8px 2px 0;white-space:nowrap">상태</td>
             <td style="color:${statCol}">${v.status}</td></tr>
+        ${waterPct !== null ? `
+        <tr><td style="color:#2fa8ff;padding:2px 8px 2px 0;white-space:nowrap">용수잔량</td>
+            <td style="color:${waterPct < 30 ? '#ff4422' : '#00e5a0'}">${waterPct}%</td></tr>
+        ` : ''}
         <tr><td style="color:#2fa8ff;padding:2px 8px 2px 0;white-space:nowrap">절대위치</td>
             <td>${v.absCoord}</td></tr>
         <tr><td style="color:#2fa8ff;padding:2px 8px 2px 0;white-space:nowrap">상대위치</td>
@@ -637,6 +669,9 @@ VEHICLES.forEach(v => {
 
 // 동적 방위선 초기화
 _initBearingLines();
+
+// 소화전 초기화 (Step 5)
+_addHydrantEntities();
 
 // ── 10. 화재건물 마커 ────────────────────────────────────────
 viewer.entities.add({
@@ -872,6 +907,10 @@ function _onPositionUpdate(id, lon, lat, alt) {
   // vehicleDataMap 위치 최신화 (방위선·카메라 계산에 사용)
   v.lon = lon; v.lat = lat; v.alt = alt;
   updateVehicleCoords(id, lon, lat, alt, v);
+
+  // AIP 추천 엔진 가동 (Step 5)
+  _checkAIPRecommendations(id);
+
   // 방위선 갱신
   if (id === 'CMD-1') {
     // 기준차 이동 시 전체 방위선 재계산
@@ -973,6 +1012,118 @@ function _makeStationCanvas(unit) {
   ctx.fillText('소', 24, 24);
 
   return c.toDataURL();
+}
+
+// ── 18. AIP 추천 엔진 & 소화전 레이어 (Step 5) ─────────────
+const hydrantEntities = {};
+const aipLines = {}; // 차량별 추천 경로 가이드 라인
+
+function _makeHydrantCanvas(h) {
+  const c = document.createElement('canvas');
+  c.width = 48; c.height = 48;
+  const ctx = c.getContext('2d');
+  const col = h.status === '사용가능' ? '#2fa8ff' : '#9ca3af';
+
+  // 물방울 배경
+  ctx.beginPath();
+  ctx.moveTo(24, 4);
+  ctx.bezierCurveTo(40, 24, 40, 44, 24, 44);
+  ctx.bezierCurveTo(8, 44, 8, 24, 24, 4);
+  ctx.fillStyle = col + 'cc'; ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+
+  // 중앙 'H' 마커
+  ctx.font = 'bold 16px "IBM Plex Mono", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('H', 24, 28);
+
+  return c.toDataURL();
+}
+
+function _addHydrantEntities() {
+  HYDRANTS.forEach(h => {
+    const entity = viewer.entities.add({
+      id: `hydrant-${h.id}`,
+      name: `소화전 ${h.id} (${h.type})`,
+      position: Cesium.Cartesian3.fromDegrees(h.lon, h.lat, 0),
+      billboard: {
+        image: _makeHydrantCanvas(h),
+        width: 32, height: 32,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      label: {
+        text: `${h.id}\n${h.status}`,
+        font: 'bold 10px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,
+        pixelOffset: new Cesium.Cartesian2(0, 4),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    hydrantEntities[h.id] = entity;
+  });
+}
+
+/**
+ * AIP 의사결정 지원: 수원 부족 차량 발생 시 가장 가까운 소화전 추천
+ */
+function _checkAIPRecommendations(id) {
+  const v = vehicleDataMap[id];
+  if (!v || v.waterLevel == null || v.role === 'amb' || v.role === 'command') return;
+
+  // 1. 수원 부족 임계치 (30%) 체크
+  if (v.waterLevel < 0.3) {
+    // 이미 알림이 나갔는지 체크 (중복 방지)
+    if (v._aipAlerted) return;
+    v._aipAlerted = true;
+
+    // 2. 가용 소화전 중 최단거리 탐색
+    let minD = Infinity;
+    let bestH = null;
+
+    HYDRANTS.filter(h => h.status === '사용가능').forEach(h => {
+      const d = _calcDist(v.lat, v.lon, h.lat, h.lon);
+      if (d < minD) { minD = d; bestH = h; }
+    });
+
+    if (bestH) {
+      // 3. 알림 출력
+      pushAlert({
+        level: 'warn',
+        text: `[AIP 추천] 용수 부족(${v.shortLabel}) - 최단거리 ${bestH.id} 소화전(${minD}m) 점유 권장`
+      });
+
+      // 4. 지도상 점선 가이드 생성
+      if (aipLines[v.id]) viewer.entities.remove(aipLines[v.id]);
+      aipLines[v.id] = viewer.entities.add({
+        polyline: {
+          positions: new Cesium.CallbackProperty(() => {
+            const hPos = Cesium.Cartesian3.fromDegrees(bestH.lon, bestH.lat, 2);
+            const vPos = Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 2);
+            return [vPos, hPos];
+          }, false),
+          width: 3,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: Cesium.Color.fromCssColorString('#2fa8ff'),
+            dashLength: 12,
+          }),
+        }
+      });
+    }
+  } else {
+    // 수원 충전 시 알림 상태 초기화 및 라인 제거
+    v._aipAlerted = false;
+    if (aipLines[v.id]) {
+      viewer.entities.remove(aipLines[v.id]);
+      delete aipLines[v.id];
+    }
+  }
 }
 
 // ── 시나리오 엔진 초기화 ─────────────────────────────────────

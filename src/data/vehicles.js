@@ -37,14 +37,8 @@ export const TYPE_ABBR = {
 };
 
 // ── 차량 13대 데이터 ─────────────────────────────────────────
-// members: 탑승 대원 개인 위치 추적 데이터
-//   id        → 대원 고유 ID (vehicleId-M번호)
-//   name      → 성명
-//   rank      → 계급
-//   oxygenPct → 공기호흡기 잔압 % (실내 진입 대원만 유효, 실외 null)
+// waterLevel: 용수 잔량 (0.0 ~ 1.0)
 export const VEHICLES = [
-
-  // ── 지휘 ─────────────────────────────────────────────────
   {
     id:          'CMD-1',
     shortLabel:  'CMD',
@@ -59,6 +53,7 @@ export const VEHICLES = [
     status:      '지휘중',
     statusLevel: 'info',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8417°N, 127.1068°E',
     relCoord:    '기준차량 (0m)',
     dist:        '기준',
@@ -67,8 +62,6 @@ export const VEHICLES = [
       { id: 'CMD-1-M2', name: '박재훈', rank: '소방사', oxygenPct: null },
     ],
   },
-
-  // ── 금암소방서 (7대) ──────────────────────────────────────
   {
     id:          'GA-PMP1',
     shortLabel:  '금암펌1',
@@ -83,6 +76,7 @@ export const VEHICLES = [
     status:      '진압중',
     statusLevel: 'safe',
     crew:        4,
+    waterLevel:  0.85,
     absCoord:    '35.8428°N, 127.1070°E',
     relCoord:    '북 122m / 358°',
     dist:        '122m',
@@ -107,6 +101,7 @@ export const VEHICLES = [
     status:      '진압중',
     statusLevel: 'safe',
     crew:        4,
+    waterLevel:  0.62,
     absCoord:    '35.8413°N, 127.1065°E',
     relCoord:    '남서 57m / 219°',
     dist:        '57m',
@@ -131,6 +126,7 @@ export const VEHICLES = [
     status:      '대기중',
     statusLevel: 'safe',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8432°N, 127.1072°E',
     relCoord:    '북 166m / 3°',
     dist:        '166m',
@@ -153,6 +149,7 @@ export const VEHICLES = [
     status:      '부상자 이송중',
     statusLevel: 'warn',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8409°N, 127.1062°E',
     relCoord:    '남서 138m / 228°',
     dist:        '138m',
@@ -175,6 +172,7 @@ export const VEHICLES = [
     status:      '급수중',
     statusLevel: 'safe',
     crew:        3,
+    waterLevel:  0.45,
     absCoord:    '35.8420°N, 127.1055°E',
     relCoord:    '서 266m / 270°',
     dist:        '266m',
@@ -198,11 +196,11 @@ export const VEHICLES = [
     status:      '건물 3F 진입',
     statusLevel: 'danger',
     crew:        3,
+    waterLevel:  0.92,
     absCoord:    'GPS 음영 (실내)',
     relCoord:    'UWB: 북동 20m / 고도 +6.0m',
     dist:        '20m↑',
     members: [
-      // 실내 진입 → 공기호흡기 잔압 추적
       { id: 'GA-FLX-M1', name: '최원준', rank: '소방장', oxygenPct: 22 },
       { id: 'GA-FLX-M2', name: '서재민', rank: '소방사', oxygenPct: 24 },
       { id: 'GA-FLX-M3', name: '홍성빈', rank: '소방사', oxygenPct: 20 },
@@ -222,6 +220,7 @@ export const VEHICLES = [
     status:      '전개완료',
     statusLevel: 'safe',
     crew:        3,
+    waterLevel:  1.0,
     absCoord:    '35.8430°N, 127.1078°E',
     relCoord:    '북 122m / 13°',
     dist:        '122m',
@@ -231,8 +230,6 @@ export const VEHICLES = [
       { id: 'GA-ARL-M3', name: '방준형', rank: '소방사', oxygenPct: null },
     ],
   },
-
-  // ── 전미소방서 (2대) ──────────────────────────────────────
   {
     id:          'JM-PMP',
     shortLabel:  '전미펌프',
@@ -247,6 +244,7 @@ export const VEHICLES = [
     status:      '진압중',
     statusLevel: 'safe',
     crew:        4,
+    waterLevel:  0.78,
     absCoord:    '35.8428°N, 127.1098°E',
     relCoord:    '북동 148m / 55°',
     dist:        '148m',
@@ -271,6 +269,7 @@ export const VEHICLES = [
     status:      '대기중',
     statusLevel: 'safe',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8420°N, 127.1110°E',
     relCoord:    '동 221m / 90°',
     dist:        '221m',
@@ -279,8 +278,6 @@ export const VEHICLES = [
       { id: 'JM-AMB-M2', name: '전혜원', rank: '소방사', oxygenPct: null },
     ],
   },
-
-  // ── 아중소방서 (3대) ──────────────────────────────────────
   {
     id:          'AJ-PMP',
     shortLabel:  '아중펌프',
@@ -295,6 +292,7 @@ export const VEHICLES = [
     status:      '수원부족',
     statusLevel: 'warn',
     crew:        4,
+    waterLevel:  0.22,
     absCoord:    '35.8410°N, 127.1092°E',
     relCoord:    '남동 122m / 140°',
     dist:        '122m',
@@ -319,6 +317,7 @@ export const VEHICLES = [
     status:      '대기중',
     statusLevel: 'safe',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8405°N, 127.1086°E',
     relCoord:    '남 166m / 178°',
     dist:        '166m',
@@ -341,6 +340,7 @@ export const VEHICLES = [
     status:      '진입준비',
     statusLevel: 'info',
     crew:        2,
+    waterLevel:  1.0,
     absCoord:    '35.8412°N, 127.1100°E',
     relCoord:    '남동 178m / 128°',
     dist:        '178m',
@@ -349,6 +349,13 @@ export const VEHICLES = [
       { id: 'AJ-SLD-M2', name: '위준서', rank: '소방사', oxygenPct: null },
     ],
   },
+];
+
+// ── 소화전 데이터 (HYDRANTS) ──────────────────────────────────
+export const HYDRANTS = [
+  { id: 'H-1', lon: 127.1080, lat: 35.8425, type: '지상식', status: '사용가능' },
+  { id: 'H-2', lon: 127.1095, lat: 35.8415, type: '지하식', status: '사용가능' },
+  { id: 'H-3', lon: 127.1060, lat: 35.8430, type: '지상식', status: '점검필요' },
 ];
 
 // ── 현장 알림 로그 ───────────────────────────────────────────
