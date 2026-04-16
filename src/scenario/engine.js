@@ -152,6 +152,7 @@ export class ScenarioEngine {
       this._state[id]    = 'on_scene';
       this._arriveAt[id] = this._t;
       this._cb.onStatusChange?.(id, path.onArrive.statusLevel, path.onArrive.status);
+      this._cb.onArrive?.(id);   // ← 도착 카메라 트리거
     }
 
     // GA-FLX 건물 진입 처리 (도착 후 고도 상승)

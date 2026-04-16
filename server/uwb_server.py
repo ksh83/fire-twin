@@ -34,7 +34,6 @@ import argparse
 import logging
 from datetime import datetime
 import websockets
-from websockets.server import serve
 
 logging.basicConfig(
     level=logging.INFO,
@@ -398,7 +397,7 @@ async def main(host: str, port: int):
     logger.info(f'차량: {len(VEHICLES)}대  대원: {len(MEMBERS)}명')
     logger.info('브라우저에서 VITE_WS_URL=ws://localhost:8765 설정 필요')
 
-    async with serve(_handle_client, host, port):
+    async with websockets.serve(_handle_client, host, port):
         await _broadcast_loop()
 
 if __name__ == '__main__':

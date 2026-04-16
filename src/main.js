@@ -8,6 +8,7 @@ import {
   startClock, startElapsed, hideLoading,
   updateVehicleCard, updateVehicleCoords,
   pushAlert, setWsStatus, setVWorldStatus,
+  updateOxygenLevel,
 } from './ui.js';
 import { startSimulation, setScenarioMode } from './simulation.js';
 import { initVWorldLayer } from './layers/vworld.js';
@@ -82,52 +83,242 @@ tacticalDS.clustering.clusterEvent.addEventListener((clusteredEntities, cluster)
 });
 
 // ── 7. 아이콘 생성 헬퍼 ─────────────────────────────────────
+
+/* roundRect 폴리필 */
+function _rr(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
+
+/* 5각별 경로 */
+function _star5(ctx, cx, cy, r1, r2) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI) / 5 - Math.PI / 2;
+    const r = i % 2 === 0 ? r1 : r2;
+    i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+            : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+/* 지휘차: 오각형 + 별 */
+function _iconCommand(ctx, col, cx, cy) {
+  ctx.fillStyle = col + 'aa';
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    i === 0 ? ctx.moveTo(cx + 26 * Math.cos(a), cy + 26 * Math.sin(a))
+            : ctx.lineTo(cx + 26 * Math.cos(a), cy + 26 * Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  _star5(ctx, cx, cy, 15, 6); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+  _star5(ctx, cx, cy, 15, 6); ctx.stroke();
+}
+
+/* 소방차 계열 (측면 실루엣) */
+function _iconTruck(ctx, col, cx, cy, subtype) {
+  const tx = cx - 30, ty = cy - 2;
+
+  // 섀시
+  ctx.fillStyle = '#111827';
+  _rr(ctx, tx, ty + 18, 60, 7, 2); ctx.fill();
+
+  // 후방 차체
+  ctx.fillStyle = col + 'cc';
+  _rr(ctx, tx + 17, ty, 43, 20, 3); ctx.fill();
+
+  // 캡
+  ctx.fillStyle = col;
+  _rr(ctx, tx, ty + 3, 20, 17, 3); ctx.fill();
+
+  // 앞유리
+  ctx.fillStyle = 'rgba(130,210,255,0.65)';
+  _rr(ctx, tx + 3, ty + 5, 13, 8, 2); ctx.fill();
+
+  // 바퀴 2개
+  [tx + 10, tx + 48].forEach(wx => {
+    ctx.fillStyle = '#0d1117';
+    ctx.beginPath(); ctx.arc(wx, ty + 27, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#374151'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(wx, ty + 27, 4, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#4B5563'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(wx, ty + 27, 7, 0, Math.PI * 2); ctx.stroke();
+  });
+
+  // 차종별 장비
+  switch (subtype) {
+    case 'pump': {
+      // 호스 릴 (원형)
+      const rx = tx + 36, ry = ty + 10;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(rx, ry, 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(rx, ry, 3, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(rx + 3 * Math.cos(a), ry + 3 * Math.sin(a));
+        ctx.lineTo(rx + 8 * Math.cos(a), ry + 8 * Math.sin(a));
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(100,200,255,0.85)';
+      ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('💧', tx + 25, ty + 10);
+      break;
+    }
+    case 'tank': {
+      // 물탱크 타원
+      ctx.fillStyle = 'rgba(100,180,255,0.18)';
+      ctx.strokeStyle = 'rgba(100,180,255,0.85)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(tx + 39, ty + 10, 17, 8, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(100,180,255,0.35)'; ctx.lineWidth = 1;
+      [-8, -2, 4, 10].forEach(dx => {
+        ctx.beginPath();
+        ctx.moveTo(tx + 39 + dx, ty + 2);
+        ctx.lineTo(tx + 39 + dx, ty + 18);
+        ctx.stroke();
+      });
+      break;
+    }
+    case 'ladder':
+    case 'smallladder': {
+      // 사선 사다리
+      const lx1 = tx + 18, ly1 = ty + 1, lx2 = tx + 56, ly2 = ty - 22;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lx1,     ly1);     ctx.lineTo(lx2,     ly2);     ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx1 + 7, ly1 + 1); ctx.lineTo(lx2 + 7, ly2 + 1); ctx.stroke();
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i <= 5; i++) {
+        const t = i / 5;
+        const rx = lx1 + t * (lx2 - lx1);
+        const ry = ly1 + t * (ly2 - ly1);
+        ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + 7, ry + 1); ctx.stroke();
+      }
+      break;
+    }
+    case 'aerial': {
+      // 수직 붐 + 플랫폼
+      ctx.strokeStyle = 'rgba(255,220,80,0.92)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(tx + 36, ty); ctx.lineTo(tx + 36, ty - 25); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,220,80,0.35)';
+      ctx.strokeStyle = 'rgba(255,220,80,0.85)'; ctx.lineWidth = 1.5;
+      ctx.fillRect(tx + 29, ty - 32, 14, 8); ctx.strokeRect(tx + 29, ty - 32, 14, 8);
+      ctx.fillStyle = 'rgba(255,220,80,0.85)';
+      ctx.beginPath(); ctx.arc(tx + 36, ty, 4, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'flex': {
+      // 굴절 붐 (곡선)
+      ctx.strokeStyle = 'rgba(255,170,50,0.92)'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(tx + 34, ty);
+      ctx.bezierCurveTo(tx + 34, ty - 12, tx + 50, ty - 18, tx + 52, ty - 28);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,170,50,0.85)';
+      ctx.beginPath(); ctx.arc(tx + 52, ty - 28, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tx + 34, ty,     4, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+  }
+}
+
+/* 구급차 (밴형) */
+function _iconAmb(ctx, col, cx, cy) {
+  const tx = cx - 28, ty = cy - 6;
+
+  // 차체 (흰색)
+  ctx.fillStyle = 'rgba(225,232,245,0.95)';
+  _rr(ctx, tx, ty, 56, 24, 4); ctx.fill();
+
+  // 소속색 사이드 스트라이프
+  ctx.fillStyle = col + 'cc';
+  ctx.fillRect(tx, ty + 12, 56, 8);
+
+  // 적십자 (후면 패널)
+  ctx.fillStyle = '#ee1111';
+  ctx.fillRect(cx + 2,  ty + 4, 12, 4);  // 가로
+  ctx.fillRect(cx + 6,  ty + 2, 4,  8);  // 세로
+
+  // 지붕 경광등 (빨강/파랑)
+  ctx.fillStyle = '#ee1111'; _rr(ctx, cx - 11, ty - 4, 7, 5, 2); ctx.fill();
+  ctx.fillStyle = '#2288ff'; _rr(ctx, cx + 4,  ty - 4, 7, 5, 2); ctx.fill();
+
+  // 앞유리
+  ctx.fillStyle = 'rgba(130,210,255,0.7)';
+  _rr(ctx, tx + 3, ty + 3, 14, 9, 2); ctx.fill();
+
+  // 섀시
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(tx, ty + 24, 56, 5);
+
+  // 바퀴
+  [tx + 10, tx + 46].forEach(wx => {
+    ctx.fillStyle = '#0d1117';
+    ctx.beginPath(); ctx.arc(wx, ty + 31, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#374151'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(wx, ty + 31, 3.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#4B5563'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(wx, ty + 31, 6,   0, Math.PI * 2); ctx.stroke();
+  });
+}
+
+/* ── 차량 아이콘 메인 함수 (80×80 캔버스) ─────────────────── */
 function _makeVehicleCanvas(v) {
-  const c   = document.createElement('canvas');
-  c.width = 64; c.height = 64;
+  const c = document.createElement('canvas');
+  c.width = 80; c.height = 80;
   const ctx = c.getContext('2d');
 
   const unitCol = UNIT_COLOR[v.unit] || '#888888';
   const statCol = STATUS_COLOR[v.statusLevel] || '#ffffff';
 
-  // 헤일로 (소속색 반투명)
-  ctx.beginPath();
-  ctx.arc(32, 32, 30, 0, Math.PI * 2);
-  ctx.fillStyle = unitCol + '22';
-  ctx.fill();
+  // 외곽 헤일로
+  ctx.beginPath(); ctx.arc(40, 40, 38, 0, Math.PI * 2);
+  ctx.fillStyle = unitCol + '18'; ctx.fill();
 
-  // 배경 원 (소속색)
-  ctx.beginPath();
-  ctx.arc(32, 32, 24, 0, Math.PI * 2);
-  ctx.fillStyle = unitCol + 'cc';
-  ctx.fill();
+  // 내부 배경 (클리핑)
+  ctx.save();
+  ctx.beginPath(); ctx.arc(40, 40, 34, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = '#050c14'; ctx.fillRect(0, 0, 80, 80);
 
-  // 상태 링 (운용 상태색)
-  ctx.beginPath();
-  ctx.arc(32, 32, 29, 0, Math.PI * 2);
+  // 차종별 그리기
+  const drawFns = {
+    command:     () => _iconCommand(ctx, unitCol, 40, 40),
+    pump:        () => _iconTruck(ctx, unitCol, 40, 44, 'pump'),
+    tank:        () => _iconTruck(ctx, unitCol, 40, 44, 'tank'),
+    ladder:      () => _iconTruck(ctx, unitCol, 40, 44, 'ladder'),
+    smallladder: () => _iconTruck(ctx, unitCol, 40, 44, 'smallladder'),
+    aerial:      () => _iconTruck(ctx, unitCol, 40, 48, 'aerial'),
+    flex:        () => _iconTruck(ctx, unitCol, 40, 48, 'flex'),
+    amb:         () => _iconAmb(ctx, unitCol, 40, 42),
+  };
+  (drawFns[v.role] || drawFns.pump)();
+  ctx.restore();
+
+  // 상태 링
+  ctx.beginPath(); ctx.arc(40, 40, 37, 0, Math.PI * 2);
   ctx.strokeStyle = statCol;
-  ctx.lineWidth = v.statusLevel === 'danger' ? 4 : 2.5;
+  ctx.lineWidth = v.statusLevel === 'danger' ? 5 : 3;
   ctx.stroke();
-
-  // 차종 텍스트
-  const abbr = TYPE_ABBR[v.role] || v.label.slice(0, 2);
-  ctx.font = 'bold 13px "Malgun Gothic", "Noto Sans KR", sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.6)';
-  ctx.shadowBlur  = 3;
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(abbr, 32, 32);
-  ctx.shadowBlur = 0;
 
   // 실내 층 배지
   if (v.indoor) {
     const floor = Math.round(v.alt / 3) + 1;
+    ctx.beginPath(); ctx.arc(62, 16, 11, 0, Math.PI * 2);
+    ctx.fillStyle = statCol; ctx.fill();
     ctx.font = 'bold 10px "IBM Plex Mono", monospace';
-    ctx.fillStyle = statCol;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`${floor}F`, 32, 1);
+    ctx.fillStyle = '#050c14';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${floor}F`, 62, 16);
   }
 
   return c.toDataURL();
@@ -251,7 +442,7 @@ function _addVehicleEntity(v) {
     position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, v.alt + 3),
     billboard: {
       image: _makeVehicleCanvas(v),
-      width: 64, height: 64,
+      width: 80, height: 80,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
       heightReference: v.indoor
@@ -293,24 +484,91 @@ function _addVehicleEntity(v) {
     });
   }
 
-  // CMD-1 → 각 차량 거리선
-  if (v.id !== 'CMD-1') {
-    const cmd = VEHICLES[0];
-    viewer.entities.add({
+  // ※ 방위선은 _initBearingLines() 에서 동적으로 생성
+}
+
+// ── 방위각 계산 helpers ──────────────────────────────────────
+function _calcBearing(lat1, lon1, lat2, lon2) {
+  const toR = d => d * Math.PI / 180;
+  const dL  = toR(lon2 - lon1);
+  const y   = Math.sin(dL) * Math.cos(toR(lat2));
+  const x   = Math.cos(toR(lat1)) * Math.sin(toR(lat2))
+              - Math.sin(toR(lat1)) * Math.cos(toR(lat2)) * Math.cos(dL);
+  return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+}
+function _calcDist(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toR = d => d * Math.PI / 180;
+  const dLat = toR(lat2 - lat1), dLon = toR(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+function _bearingDir(deg) {
+  const D = ['북','북북동','북동','동북동','동','동남동','남동','남남동',
+             '남','남남서','남서','서남서','서','서북서','북서','북북서'];
+  return D[Math.round(deg / 22.5) % 16];
+}
+
+// ── 방위선 엔티티 관리 ───────────────────────────────────────
+const bearingEntities = {};
+
+function _initBearingLines() {
+  const cmd = vehicleDataMap['CMD-1'];
+  if (!cmd) return;
+  VEHICLES.filter(v => v.id !== 'CMD-1').forEach(v => {
+    const unitCol = UNIT_COLOR[v.unit] || '#888888';
+    const dist    = _calcDist(cmd.lat, cmd.lon, v.lat, v.lon);
+    const bear    = _calcBearing(cmd.lat, cmd.lon, v.lat, v.lon);
+
+    bearingEntities[v.id] = viewer.entities.add({
+      id:       `bearing-${v.id}`,
+      position: Cesium.Cartesian3.fromDegrees(
+        (cmd.lon + v.lon) / 2, (cmd.lat + v.lat) / 2, 4
+      ),
+      label: {
+        text:        `${_bearingDir(bear)} ${dist}m`,
+        font:        'bold 10px "IBM Plex Mono", monospace',
+        fillColor:   Cesium.Color.fromCssColorString(unitCol).withAlpha(0.9),
+        outlineColor:Cesium.Color.fromCssColorString('#060810'),
+        outlineWidth: 2,
+        style:        Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -4),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 700),
+        scaleByDistance: new Cesium.NearFarScalar(50, 1.0, 600, 0.5),
+      },
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArrayHeights([
-          cmd.lon, cmd.lat, 1,
-          v.lon, v.lat, 1,
+          cmd.lon, cmd.lat, 3,
+          v.lon, v.lat, 3,
         ]),
-        width: 1,
+        width: 1.5,
         material: new Cesium.PolylineDashMaterialProperty({
-          color: Cesium.Color.fromCssColorString('#1a2230'),
-          dashLength: 12,
+          color:      Cesium.Color.fromCssColorString(unitCol).withAlpha(0.5),
+          dashLength: 14,
         }),
-        clampToGround: true,
+        clampToGround: false,
       },
     });
-  }
+  });
+}
+
+function _updateBearingLine(id, lon, lat) {
+  const entity = bearingEntities[id];
+  if (!entity) return;
+  const cmd = vehicleDataMap['CMD-1'];
+  if (!cmd) return;
+
+  const dist = _calcDist(cmd.lat, cmd.lon, lat, lon);
+  const bear = _calcBearing(cmd.lat, cmd.lon, lat, lon);
+  entity.polyline.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
+    cmd.lon, cmd.lat, 3, lon, lat, 3,
+  ]);
+  entity.position = Cesium.Cartesian3.fromDegrees(
+    (cmd.lon + lon) / 2, (cmd.lat + lat) / 2, 4
+  );
+  entity.label.text = `${_bearingDir(bear)} ${dist}m`;
 }
 
 function _makeVehicleDescription(v) {
@@ -377,6 +635,9 @@ VEHICLES.forEach(v => {
   _addMemberEntities(v);
 });
 
+// 동적 방위선 초기화
+_initBearingLines();
+
 // ── 10. 화재건물 마커 ────────────────────────────────────────
 viewer.entities.add({
   position: Cesium.Cartesian3.fromDegrees(INCIDENT.lon, INCIDENT.lat, 22),
@@ -432,6 +693,40 @@ function _handleVehicleAdd(v) {
 }
 
 // ── 13. 카메라 함수 ──────────────────────────────────────────
+
+// 도착 카메라 잠금 (중첩 flyTo 방지)
+let _cameraLocked = false;
+
+/**
+ * 차량 현장 도착 시 자동 카메라 시퀀스
+ * ① 해당 차량 근거리 확대 (1.6s) → ② 1.8s 대기 → ③ 현장 전체 조망 복귀
+ */
+export function onVehicleArrive(id) {
+  if (_cameraLocked) return;
+  _cameraLocked = true;
+
+  const v = vehicleDataMap[id];
+  if (!v) { _cameraLocked = false; return; }
+
+  // 단계 1: 차량 근접 확대
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(v.lon, v.lat - 0.0005, 110),
+    orientation: {
+      heading: Cesium.Math.toRadians(8),
+      pitch:   Cesium.Math.toRadians(-48),
+      roll: 0,
+    },
+    duration: 1.6,
+    complete: () => {
+      // 단계 2: 현장 전체 복귀
+      setTimeout(() => {
+        flyToIncident();
+        setTimeout(() => { _cameraLocked = false; }, 2700);
+      }, 1800);
+    },
+  });
+}
+
 export function flyToIncident() {
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(
@@ -574,8 +869,48 @@ startSimulation(vehicleEntities, _onPositionUpdate, {
 function _onPositionUpdate(id, lon, lat, alt) {
   const v = vehicleDataMap[id];
   if (!v) return;
+  // vehicleDataMap 위치 최신화 (방위선·카메라 계산에 사용)
+  v.lon = lon; v.lat = lat; v.alt = alt;
   updateVehicleCoords(id, lon, lat, alt, v);
+  // 방위선 갱신
+  if (id === 'CMD-1') {
+    // 기준차 이동 시 전체 방위선 재계산
+    Object.keys(bearingEntities).forEach(vid => {
+      const vd = vehicleDataMap[vid];
+      if (vd) _updateBearingLine(vid, vd.lon, vd.lat);
+    });
+  } else {
+    _updateBearingLine(id, lon, lat);
+  }
 }
+
+// ── 산소량 시뮬레이션 (실내 대원 공기호흡기 잔압 감소) ────────
+let _oxyLastTick = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const dt  = (now - _oxyLastTick) / 1000;   // 경과 초
+  _oxyLastTick = now;
+
+  VEHICLES.filter(v => v.indoor && v.members).forEach(v => {
+    v.members.forEach(m => {
+      if (m.oxygenPct == null) return;
+      // 0.2%/초 소진 → 데모에서 ~1.5분 후 완전 소진
+      m.oxygenPct = Math.max(0, m.oxygenPct - dt * 0.2);
+      const pct = Math.round(m.oxygenPct);
+      updateOxygenLevel(m.id, pct);
+
+      // 임계치 경보 (1회성)
+      if (!m._alerted15 && pct <= 15) {
+        m._alerted15 = true;
+        pushAlert({ level: 'danger', text: `🚨 ${m.name}(${v.shortLabel}) 잔압 15% — 위험` });
+      }
+      if (!m._alerted10 && pct <= 10) {
+        m._alerted10 = true;
+        pushAlert({ level: 'danger', text: `⛔ ${m.name}(${v.shortLabel}) 잔압 10% — 즉각 철수` });
+      }
+    });
+  });
+}, 2000);
 
 // ── 소방서 마커 (시나리오용) ─────────────────────────────────
 function _addStationMarkers() {
@@ -671,6 +1006,9 @@ const scenario = new ScenarioEngine({
   onCamera(target) {
     if (target === 'incident') flyToIncident();
   },
+
+  // 차량 현장 도착 → 자동 확대
+  onArrive: onVehicleArrive,
 
   // 초기화
   onReset() {

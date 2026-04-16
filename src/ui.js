@@ -163,6 +163,29 @@ function _renderAlert(a) {
   </div>`;
 }
 
+// ── 산소량 섹션 HTML ─────────────────────────────────────────
+function _renderOxySection(vId, members) {
+  if (!members) return '';
+  const oxyList = members.filter(m => m.oxygenPct != null);
+  if (oxyList.length === 0) return '';
+  const critical = oxyList.some(m => m.oxygenPct < 20);
+  const rows = oxyList.map(m => {
+    const pct = Math.round(m.oxygenPct);
+    const lvl = pct < 20 ? 'danger' : pct < 40 ? 'warn' : 'safe';
+    return `<div class="oxy-row" id="oxy-row-${m.id}">
+      <span class="oxy-name">${m.name}</span>
+      <div class="oxy-track">
+        <div class="oxy-fill" id="oxy-fill-${m.id}"
+             style="width:${pct}%;background:var(--${lvl})"></div>
+      </div>
+      <span class="oxy-pct" id="oxy-pct-${m.id}"
+            style="color:var(--${lvl})">${pct}%</span>
+    </div>`;
+  }).join('');
+  return `<div class="vc-oxy${critical ? ' oxy-warn' : ''}" id="oxy-section-${vId}">
+    <div class="oxy-title">🫁 공기호흡기 잔압</div>${rows}</div>`;
+}
+
 // ── 차량 카드 HTML ────────────────────────────────────────────
 function _renderVehicleCard(v) {
   return `
@@ -184,6 +207,7 @@ function _renderVehicleCard(v) {
         <div class="vc-crew"><span class="crew-pip"></span>${v.crew}명 탑승</div>
         <div class="vc-dist">${v.dist}</div>
       </div>
+      ${_renderOxySection(v.id, v.members)}
     </div>`;
 }
 
@@ -290,6 +314,23 @@ export function setWsStatus(connected) {
     dot.className = 'ts-dot warn';     // warn (노랑)
     val.textContent = '시뮬레이션';
   }
+}
+
+// ── 산소량 실시간 갱신 ────────────────────────────────────────
+export function updateOxygenLevel(memberId, pct) {
+  const fill   = document.getElementById(`oxy-fill-${memberId}`);
+  const pctEl  = document.getElementById(`oxy-pct-${memberId}`);
+  if (!fill && !pctEl) return;
+
+  const p   = Math.max(0, pct);
+  const lvl = p < 20 ? 'danger' : p < 40 ? 'warn' : 'safe';
+  const col = `var(--${lvl})`;
+
+  if (fill)  { fill.style.width = `${p}%`; fill.style.background = col; }
+  if (pctEl) { pctEl.textContent = `${p}%`; pctEl.style.color = col; }
+
+  const section = fill?.closest('.vc-oxy') || pctEl?.closest('.vc-oxy');
+  if (section) section.classList.toggle('oxy-warn', p < 20);
 }
 
 // ── V-World 상태 표시 ────────────────────────────────────────
