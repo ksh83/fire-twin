@@ -22,25 +22,41 @@ import {
 buildLayout();
 
 // ── 2. Cesium 토큰 설정 ──────────────────────────────────────
-Cesium.Ion.defaultAccessToken =
-  import.meta.env.VITE_CESIUM_TOKEN || 'YOUR_TOKEN_HERE';
+const CESIUM_TOKEN = import.meta.env.VITE_CESIUM_TOKEN || 'YOUR_TOKEN_HERE';
+if (!CESIUM_TOKEN || CESIUM_TOKEN === 'YOUR_TOKEN_HERE') {
+  console.warn('[FIRE.TWIN] Cesium Ion 토큰이 설정되지 않았습니다. 지형/건물 로드가 제한될 수 있습니다.');
+}
+Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
 
 // ── 3. Viewer 초기화 ─────────────────────────────────────────
-const viewer = new Cesium.Viewer('cesiumContainer', {
-  terrain:              Cesium.Terrain.fromWorldTerrain(),
-  animation:            false,
-  baseLayerPicker:      false,
-  fullscreenButton:     false,
-  geocoder:             false,
-  homeButton:           false,
-  infoBox:              true,
-  sceneModePicker:      false,
-  selectionIndicator:   true,
-  timeline:             false,
-  navigationHelpButton: false,
-  shadows:              true,
-  shouldAnimate:        true,
-});
+let viewer;
+try {
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    terrain:              Cesium.Terrain.fromWorldTerrain(),
+    animation:            false,
+    baseLayerPicker:      false,
+    fullscreenButton:     false,
+    geocoder:             false,
+    homeButton:           false,
+    infoBox:              true,
+    sceneModePicker:      false,
+    selectionIndicator:   true,
+    timeline:             false,
+    navigationHelpButton: false,
+    shadows:              true,
+    shouldAnimate:        true,
+    msaaSamples:          4,
+  });
+} catch (err) {
+  console.error('[FIRE.TWIN] Cesium Viewer 초기화 실패:', err);
+  const container = document.getElementById('cesiumContainer');
+  if (container) {
+    container.innerHTML = `<div style="color:white;padding:20px;text-align:center;">
+      <h3>3D 엔진 초기화 실패</h3>
+      <p>브라우저가 WebGL을 지원하지 않거나 가속이 꺼져 있을 수 있습니다.</p>
+    </div>`;
+  }
+}
 
 viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
 viewer.scene.globe.enableLighting = true;

@@ -64,13 +64,22 @@ export function startSimulation(vehicleEntities, onPositionUpdate, callbacks = {
 
 // ── WebSocket 연결 시도 ──────────────────────────────────────
 function _tryWebSocket() {
-  const wsUrl = (import.meta.env.VITE_WS_URL || 'ws://localhost:8765');
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const wsUrl   = (import.meta.env.VITE_WS_URL || 'ws://localhost:8765');
+
+  // 배포 환경에서는 로컬 서버가 없을 확률이 99%이므로 로컬 시뮬레이션을 먼저 띄워둔다.
+  if (!isLocal) {
+    console.info('[FIRE.TWIN] 배포 환경 감지: 로컬 시뮬레이션 우선 모드');
+    _startLocalSim();
+    // 배포 환경에서도 서버가 있을 수 있으므로 연결은 시도하되 조용히 처리
+  }
 
   let ws;
   try {
     ws = new WebSocket(wsUrl);
-  } catch {
-    _startLocalSim();
+  } catch (err) {
+    if (isLocal) console.warn('[FIRE.TWIN] WebSocket 생성 실패:', err);
+    if (!_wsMode) _startLocalSim();
     return;
   }
 
